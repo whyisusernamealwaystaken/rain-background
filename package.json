@@ -2,15 +2,27 @@
   "name": "rain-background",
   "displayName": "Rain Background",
   "description": "Animated rain effect for VS Code",
-  "version": "0.0.2",
-  "engines": {
-    "vscode": "^1.80.0"
+  "version": "0.0.3",
+  "publisher": "your-publisher-id",
+  "icon": "images/icon.png",
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
   },
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/yourusername/rain-background"
   },
-  "categories": ["Themes"],
+  "bugs": {
+    "url": "https://github.com/yourusername/rain-background/issues"
+  },
+  "homepage": "https://github.com/yourusername/rain-background#readme",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": ["Themes", "Other"],
+  "keywords": ["rain", "background", "animation", "theme", "aesthetic"],
   "activationEvents": [
     "onCommand:rain-background.enable",
     "onCommand:rain-background.disable"
