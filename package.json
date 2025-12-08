@@ -1,0 +1,90 @@
+{
+  "name": "rain-background",
+  "displayName": "Rain Background",
+  "description": "Animated rain effect for VS Code",
+  "version": "0.0.2",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/rain-background"
+  },
+  "categories": ["Themes"],
+  "activationEvents": [
+    "onCommand:rain-background.enable",
+    "onCommand:rain-background.disable"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "rain-background.enable",
+        "title": "Rain Background: Enable"
+      },
+      {
+        "command": "rain-background.disable",
+        "title": "Rain Background: Disable"
+      }
+    ],
+    "configuration": {
+      "title": "Rain Background",
+      "properties": {
+        "rainBackground.windowsUsername": {
+          "type": "string",
+          "default": "",
+          "description": "Your Windows username (required for WSL users). Leave empty for auto-detect on native Windows."
+        },
+        "rainBackground.areas": {
+          "type": "array",
+          "default": ["editor"],
+          "items": {
+            "type": "string",
+            "enum": ["editor", "sidebar", "panel", "activitybar", "fullscreen"]
+          },
+          "description": "Areas to show rain effect: editor, sidebar, panel, activitybar, or fullscreen"
+        },
+        "rainBackground.dropCount": {
+          "type": "number",
+          "default": 150,
+          "description": "Number of raindrops"
+        },
+        "rainBackground.speed": {
+          "type": "number",
+          "default": 4,
+          "minimum": 1,
+          "maximum": 20,
+          "description": "Base speed of raindrops"
+        },
+        "rainBackground.opacity": {
+          "type": "number",
+          "default": 0.3,
+          "minimum": 0.05,
+          "maximum": 1,
+          "description": "Maximum opacity of raindrops"
+        },
+        "rainBackground.wind": {
+          "type": "number",
+          "default": 2,
+          "minimum": -10,
+          "maximum": 10,
+          "description": "Wind angle (negative = left, positive = right)"
+        },
+        "rainBackground.color": {
+          "type": "string",
+          "default": "150, 190, 255",
+          "description": "Rain color in RGB format (e.g., '150, 190, 255' for blue)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}
