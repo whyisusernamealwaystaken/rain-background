@@ -252,18 +252,52 @@ function isRainEnabled(): boolean {
 }
 
 export function activate(context: vscode.ExtensionContext) {
-  // Watch for settings changes
+  // Prompt to enable on first activation
+  const hasPrompted = context.globalState.get<boolean>('hasPromptedEnable');
+  if (!hasPrompted && !isRainEnabled()) {
+    context.globalState.update('hasPromptedEnable', true);
+    vscode.window.showInformationMessage(
+      'Rain Background installed! Would you like to enable the rain effect?',
+      'Enable',
+      'Later'
+    ).then(selection => {
+      if (selection === 'Enable') {
+        vscode.commands.executeCommand('rain-background.enable');
+      }
+    });
+  }
+
+  // Watch for settings changes and auto-apply
   context.subscriptions.push(
-    vscode.workspace.onDidChangeConfiguration(e => {
-      if (e.affectsConfiguration('rainBackground') && isRainEnabled()) {
-        vscode.window.showInformationMessage(
-          'Rain settings changed. Re-enable to apply.',
-          'Re-enable Now'
-        ).then(selection => {
-          if (selection === 'Re-enable Now') {
-            vscode.commands.executeCommand('rain-background.enable');
-          }
-        });
+    vscode.workspace.onDidChangeConfiguration(async e => {
+      if (!e.affectsConfiguration('rainBackground')) {
+        return;
+      }
+
+      if (!isRainEnabled()) {
+        return;
+      }
+
+      try {
+        const jsPath = getWorkbenchJSPath();
+        let content = fs.readFileSync(jsPath, 'utf8');
+
+        // Remove old rain code and add updated config
+        content = content.replace(/\/\* RAIN-BACKGROUND-START \*\/[\s\S]*?\/\* RAIN-BACKGROUND-END \*\//g, '');
+        const rainConfig = getRainConfig();
+        content += generateRainJS(rainConfig);
+        fs.writeFileSync(jsPath, content, 'utf8');
+
+        const result = await vscode.window.showInformationMessage(
+          'Rain settings updated. Restart VS Code to apply.',
+          'Restart Now'
+        );
+
+        if (result === 'Restart Now') {
+          vscode.commands.executeCommand('workbench.action.reloadWindow');
+        }
+      } catch (err: any) {
+        vscode.window.showErrorMessage(`Failed to update rain settings: ${err.message}`);
       }
     })
   );
@@ -318,4 +352,33 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(enableCmd, disableCmd);
 }
 
-export function deactivate() {}
+export function deactivate() {
+  // Attempt to clean up rain code when extension is deactivated/uninstalled
+  try {
+    const appRoot = vscode.env.appRoot;
+    let jsPath: string;
+
+    if (appRoot.includes('.vscode-server')) {
+      // WSL - try common paths
+      const config = vscode.workspace.getConfiguration('rainBackground');
+      const windowsUser = config.get<string>('windowsUsername') || 'User';
+      const possiblePaths = [
+        `/mnt/c/Users/${windowsUser}/AppData/Local/Programs/Microsoft VS Code/resources/app/out/vs/workbench/workbench.desktop.main.js`,
+        '/mnt/c/Program Files/Microsoft VS Code/resources/app/out/vs/workbench/workbench.desktop.main.js',
+      ];
+      jsPath = possiblePaths.find(p => fs.existsSync(p)) || '';
+    } else {
+      jsPath = path.join(appRoot, 'out', 'vs', 'workbench', 'workbench.desktop.main.js');
+    }
+
+    if (jsPath && fs.existsSync(jsPath)) {
+      let content = fs.readFileSync(jsPath, 'utf8');
+      if (content.includes('RAIN-BACKGROUND-START')) {
+        content = content.replace(/\/\* RAIN-BACKGROUND-START \*\/[\s\S]*?\/\* RAIN-BACKGROUND-END \*\//g, '');
+        fs.writeFileSync(jsPath, content, 'utf8');
+      }
+    }
+  } catch {
+    // Silent fail - deactivate shouldn't throw
+  }
+}

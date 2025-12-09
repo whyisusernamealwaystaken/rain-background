@@ -2,7 +2,7 @@
   "name": "rain-background",
   "displayName": "Rain Background",
   "description": "Animated rain effect for VS Code",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "publisher": "tobe",
   "icon": "images/icon.png",
   "galleryBanner": {
@@ -24,8 +24,7 @@
   "categories": ["Themes", "Other"],
   "keywords": ["rain", "background", "animation", "theme", "aesthetic"],
   "activationEvents": [
-    "onCommand:rain-background.enable",
-    "onCommand:rain-background.disable"
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -91,6 +90,7 @@
     }
   },
   "scripts": {
+    "vscode:uninstall": "node -e \"const fs=require('fs'),os=require('os'),path=require('path');const paths=[];if(process.platform==='win32'){const l=process.env.LOCALAPPDATA||path.join(os.homedir(),'AppData','Local');paths.push(path.join(l,'Programs','Microsoft VS Code','resources','app','out','vs','workbench','workbench.desktop.main.js'),'C:\\\\Program Files\\\\Microsoft VS Code\\\\resources\\\\app\\\\out\\\\vs\\\\workbench\\\\workbench.desktop.main.js');}else if(process.platform==='linux'){try{if(fs.readFileSync('/proc/version','utf8').toLowerCase().includes('microsoft')){const u='/mnt/c/Users';if(fs.existsSync(u)){fs.readdirSync(u).filter(x=>!['Public','Default','Default User','All Users'].includes(x)&&!x.startsWith('.')).forEach(x=>paths.push('/mnt/c/Users/'+x+'/AppData/Local/Programs/Microsoft VS Code/resources/app/out/vs/workbench/workbench.desktop.main.js'));}paths.push('/mnt/c/Program Files/Microsoft VS Code/resources/app/out/vs/workbench/workbench.desktop.main.js');}}catch{}paths.push('/usr/share/code/resources/app/out/vs/workbench/workbench.desktop.main.js');}else if(process.platform==='darwin'){paths.push('/Applications/Visual Studio Code.app/Contents/Resources/app/out/vs/workbench/workbench.desktop.main.js');}paths.forEach(p=>{try{if(fs.existsSync(p)){let c=fs.readFileSync(p,'utf8');if(c.includes('RAIN-BACKGROUND-START')){c=c.replace(/\\/\\* RAIN-BACKGROUND-START \\*\\/[\\s\\S]*?\\/\\* RAIN-BACKGROUND-END \\*\\//g,'');fs.writeFileSync(p,c,'utf8');}}}catch{}});\"",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./"
   },
