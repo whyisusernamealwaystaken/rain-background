@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
+import * as crypto from 'crypto';
 
 interface RainConfig {
   areas: string[];
@@ -204,19 +206,65 @@ function getWindowsUsername(): string {
   return 'User';
 }
 
+function findWorkbenchFile(vscodeDir: string): string | undefined {
+  const workbenchRelPath = path.join('resources', 'app', 'out', 'vs', 'workbench', 'workbench.desktop.main.js');
+
+  const directPath = path.join(vscodeDir, workbenchRelPath);
+  if (fs.existsSync(directPath)) {
+    return directPath;
+  }
+
+  // VS Code 1.100+ moves content into a hash-named subdirectory
+  try {
+    const entries = fs.readdirSync(vscodeDir);
+    for (const entry of entries) {
+      if (/^[0-9a-f]{6,}$/.test(entry)) {
+        const hashPath = path.join(vscodeDir, entry, workbenchRelPath);
+        if (fs.existsSync(hashPath)) {
+          return hashPath;
+        }
+      }
+    }
+  } catch {}
+
+  return undefined;
+}
+
+function updateWorkbenchChecksum(jsPath: string): void {
+  try {
+    const productJsonPath = path.join(jsPath, '..', '..', '..', '..', 'product.json');
+    if (!fs.existsSync(productJsonPath)) {
+      return;
+    }
+
+    const content = fs.readFileSync(jsPath, 'utf8');
+    const hash = crypto.createHash('sha256').update(content).digest('base64');
+
+    let productJson = fs.readFileSync(productJsonPath, 'utf8');
+    const checksumKey = 'vs/workbench/workbench.desktop.main.js';
+    const regex = new RegExp(`("${checksumKey.replace(/\//g, '\\/')}":\\s*")([^"]+)(")`);
+
+    if (regex.test(productJson)) {
+      productJson = productJson.replace(regex, `$1${hash}$3`);
+      fs.writeFileSync(productJsonPath, productJson, 'utf8');
+    }
+  } catch {}
+}
+
 function getWorkbenchJSPath(): string {
   const appRoot = vscode.env.appRoot;
 
   if (appRoot.includes('.vscode-server')) {
     const windowsUser = getWindowsUsername();
-    const possiblePaths = [
-      `/mnt/c/Users/${windowsUser}/AppData/Local/Programs/Microsoft VS Code/resources/app/out/vs/workbench/workbench.desktop.main.js`,
-      '/mnt/c/Program Files/Microsoft VS Code/resources/app/out/vs/workbench/workbench.desktop.main.js',
+    const installDirs = [
+      `/mnt/c/Users/${windowsUser}/AppData/Local/Programs/Microsoft VS Code`,
+      '/mnt/c/Program Files/Microsoft VS Code',
     ];
 
-    for (const p of possiblePaths) {
-      if (fs.existsSync(p)) {
-        return p;
+    for (const dir of installDirs) {
+      const found = findWorkbenchFile(dir);
+      if (found) {
+        return found;
       }
     }
 
@@ -226,6 +274,10 @@ function getWorkbenchJSPath(): string {
     );
   }
 
+  const found = findWorkbenchFile(path.join(appRoot, '..'));
+  if (found) {
+    return found;
+  }
   return path.join(appRoot, 'out', 'vs', 'workbench', 'workbench.desktop.main.js');
 }
 
@@ -287,6 +339,7 @@ export function activate(context: vscode.ExtensionContext) {
         const rainConfig = getRainConfig();
         content += generateRainJS(rainConfig);
         fs.writeFileSync(jsPath, content, 'utf8');
+        updateWorkbenchChecksum(jsPath);
 
         const result = await vscode.window.showInformationMessage(
           'Rain settings updated. Restart VS Code to apply.',
@@ -305,6 +358,20 @@ export function activate(context: vscode.ExtensionContext) {
   const enableCmd = vscode.commands.registerCommand('rain-background.enable', async () => {
     try {
       const jsPath = getWorkbenchJSPath();
+
+      // Check write permissions before attempting
+      try {
+        fs.accessSync(jsPath, fs.constants.W_OK);
+      } catch {
+        if (os.platform() === 'darwin') {
+          vscode.window.showErrorMessage(
+            'Permission denied. Run in Terminal: sudo chown -R $(whoami) "/Applications/Visual Studio Code.app"'
+          );
+          return;
+        }
+        throw new Error(`No write permission to ${jsPath}`);
+      }
+
       let content = fs.readFileSync(jsPath, 'utf8');
 
       // Remove old rain code if exists
@@ -314,6 +381,7 @@ export function activate(context: vscode.ExtensionContext) {
       const rainConfig = getRainConfig();
       content += generateRainJS(rainConfig);
       fs.writeFileSync(jsPath, content, 'utf8');
+      updateWorkbenchChecksum(jsPath);
 
       const result = await vscode.window.showInformationMessage(
         `Rain enabled on: ${rainConfig.areas.join(', ')}. Restart VS Code to see the effect.`,
@@ -324,7 +392,13 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand('workbench.action.reloadWindow');
       }
     } catch (err: any) {
-      vscode.window.showErrorMessage(`Failed to enable: ${err.message}`);
+      if (os.platform() === 'darwin' && (err.code === 'EACCES' || err.message.includes('permission'))) {
+        vscode.window.showErrorMessage(
+          'Permission denied. Run in Terminal: sudo chown -R $(whoami) "/Applications/Visual Studio Code.app"'
+        );
+      } else {
+        vscode.window.showErrorMessage(`Failed to enable: ${err.message}`);
+      }
     }
   });
 
@@ -335,6 +409,7 @@ export function activate(context: vscode.ExtensionContext) {
 
       content = content.replace(/\/\* RAIN-BACKGROUND-START \*\/[\s\S]*?\/\* RAIN-BACKGROUND-END \*\//g, '');
       fs.writeFileSync(jsPath, content, 'utf8');
+      updateWorkbenchChecksum(jsPath);
 
       const result = await vscode.window.showInformationMessage(
         'Rain background disabled! Restart VS Code to apply.',
@@ -353,32 +428,7 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {
-  // Attempt to clean up rain code when extension is deactivated/uninstalled
-  try {
-    const appRoot = vscode.env.appRoot;
-    let jsPath: string;
-
-    if (appRoot.includes('.vscode-server')) {
-      // WSL - try common paths
-      const config = vscode.workspace.getConfiguration('rainBackground');
-      const windowsUser = config.get<string>('windowsUsername') || 'User';
-      const possiblePaths = [
-        `/mnt/c/Users/${windowsUser}/AppData/Local/Programs/Microsoft VS Code/resources/app/out/vs/workbench/workbench.desktop.main.js`,
-        '/mnt/c/Program Files/Microsoft VS Code/resources/app/out/vs/workbench/workbench.desktop.main.js',
-      ];
-      jsPath = possiblePaths.find(p => fs.existsSync(p)) || '';
-    } else {
-      jsPath = path.join(appRoot, 'out', 'vs', 'workbench', 'workbench.desktop.main.js');
-    }
-
-    if (jsPath && fs.existsSync(jsPath)) {
-      let content = fs.readFileSync(jsPath, 'utf8');
-      if (content.includes('RAIN-BACKGROUND-START')) {
-        content = content.replace(/\/\* RAIN-BACKGROUND-START \*\/[\s\S]*?\/\* RAIN-BACKGROUND-END \*\//g, '');
-        fs.writeFileSync(jsPath, content, 'utf8');
-      }
-    }
-  } catch {
-    // Silent fail - deactivate shouldn't throw
-  }
+  // No-op: cleanup is handled by vscode:uninstall script and the disable command.
+  // deactivate() runs on every reload/window close, so we must not touch the
+  // workbench file here.
 }

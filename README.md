@@ -14,6 +14,16 @@ Adds a beautiful animated rain effect to your VS Code editor.
 2. Run "Rain Background: Enable"
 3. Restart VS Code
 
+## Notes
+
+- After every VS Code update, you need to re-enable the extension as updates overwrite the modified files.
+- After enabling, VS Code will show a "corrupted" warning. This is harmless — click the gear icon and select "Don't Show Again".
+- **Before uninstalling**, you must disable the extension first by running "Rain Background: Disable". This removes the injected code from VS Code.
+- **macOS users**: If you get a permission error, run this in Terminal:
+  ```
+  sudo chown -R $(whoami) "/Applications/Visual Studio Code.app"
+  ```
+
 ## Settings
 
 | Setting | Description | Default |
@@ -26,19 +36,11 @@ Adds a beautiful animated rain effect to your VS Code editor.
 | `rainBackground.color` | RGB color | `150, 190, 255` |
 | `rainBackground.windowsUsername` | Windows username (WSL) | Auto-detect |
 
-## Important
-
-**Before uninstalling this extension, you must disable it first** by running "Rain Background: Disable" from the Command Palette. This removes the injected code from VS Code. If you uninstall without disabling, the rain effect may persist or cause issues.
-
-## Note
-
-After enabling, VS Code will show a "corrupted" warning. This is harmless — click the gear icon and select "Don't Show Again".
-
 ## License
 
 MIT License
 
-Copyright (c) 2024 Tobias Hönel
+Copyright (c) 2026 Tobias Hönel
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
